@@ -2,6 +2,7 @@
 
 [![API](https://img.shields.io/badge/LibXposed-API%20102-brightgreen)](https://github.com/libxposed/api)
 [![Target](https://img.shields.io/badge/Target-LSPosed%201.9.3%2B-blue)](https://github.com/LSPosed/LSPosed)
+[![Android](https://img.shields.io/badge/Android-9.0--16%20(ColorOS%2016)-orange)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-Apache%202.0-orange)](LICENSE)
 [![Type](https://img.shields.io/badge/Agent%20Skill-Antigravity%20%7C%20Claude%20%7C%20Cursor-purple)](#)
 
@@ -13,11 +14,15 @@
 
 ## 📦 技能能力一览
 
-- **自动依赖迁移**：将旧版 `de.robv.android.xposed:api`（54-93）迁移至 `io.github.libxposed:api:102.0.0`。
+- **自动依赖迁移**：将旧版 `de.robv.android.xposed:api`（54-93）迁移至 `io.github.libxposed:api:102.0.0`，适配 Java 17 与 Android SDK 34+。
 - **现代元数据生成**：规范化生成 `META-INF/xposed/` 目录下的 `module.prop`、`java_init.list` 与 `scope.list`。
-- **Hook 模型重构**：将老旧反射及 `XC_MethodHook` 改写为现代链式拦截器（`Hooker` / `Chain`），并配置热重载（Hot Reload）。
-- **性能深度优化**：自动对 `isEnabled` 等系统高频调用注入优化模版（Android 14+ `StackWalker` 惰性遍历、底层零开销直通嗅探与动态栈帧定位），彻底杜绝 GC 卡顿掉帧。
-- **构建环境自适应**：自动修复 Java 17/21 与旧版 Gradle 冲突（如 `major version 61` 异常），适配 Android SDK 34。
+- **系统服务级 Hook**：提供 `system_server` 专用入口 (`onSystemServerStarting`)、系统 Context 双重安全捕获与延迟初始化范式。
+- **跨进程特权隔离防护**：提供针对 Android 14/15/16（包括 ColorOS 16 / HyperOS 等定制 ROM）下的 `Binder.clearCallingIdentity` 特权提升范式，根除系统级 Hook 常见权限拒绝异常（`Permission Denial`）。
+- **零常驻配置热同步**：提供基于 `Settings.Global` 配合 `ContentObserver` 的免常驻、零功耗、抗杀后台的无感实时热重载方案，彻底替代在现代 Android 下失效的 `XSharedPreferences`。
+- **模块状态自检测 (Self-Hooking)**：在模块加载生命周期中精准识别自身应用，通过优先级 Hook 实现优雅的模块激活状态自检测。
+- **Hook 模型重构 & 反射工具库**：将老旧反射及 `XC_MethodHook` 改写为现代链式拦截器（`Hooker` / `Chain`），并提供轻量零依赖的反射辅助类（替代已废弃的 `XposedHelpers`）。
+- **性能深度优化**：针对 `isEnabled`、视图绘制等系统高频调用，自动注入优化模板（Android 14+ `StackWalker` 惰性遍历、底层零开销直通嗅探与动态栈帧定位），彻底杜绝 GC 卡顿掉帧。
+- **CI/CD 与官方分发仓库集成**：内置提交至 LSPosed 官方模块仓库（`Xposed-Modules-Repo`）的自动化 Actions 规范，解决跨仓库推送 403 权限覆盖陷阱、JKS 机密管理与文档免跑 CI 策略。
 
 ---
 
@@ -28,13 +33,13 @@
 #### Windows (PowerShell):
 ```powershell
 # 克隆至 Antigravity / Gemini CLI 全局配置目录
-git clone https://github.com/<your-username>/skill-upgrade-libxposed-102.git "$HOME\.gemini\config\skills\upgrade-libxposed-102"
+git clone https://github.com/Marukon/skill-upgrade-libxposed-102.git "$HOME\.gemini\config\skills\upgrade-libxposed-102"
 ```
 
 #### Linux / macOS (Bash):
 ```bash
 # 克隆至全局配置目录
-git clone https://github.com/<your-username>/skill-upgrade-libxposed-102.git "$HOME/.gemini/config/skills/upgrade-libxposed-102"
+git clone https://github.com/Marukon/skill-upgrade-libxposed-102.git "$HOME/.gemini/config/skills/upgrade-libxposed-102"
 ```
 
 ---
@@ -45,7 +50,7 @@ git clone https://github.com/<your-username>/skill-upgrade-libxposed-102.git "$H
 
 ```bash
 # 作为 Git 子模块引入到项目 agents 目录
-git submodule add https://github.com/<your-username>/skill-upgrade-libxposed-102.git .agents/skills/upgrade-libxposed-102
+git submodule add https://github.com/Marukon/skill-upgrade-libxposed-102.git .agents/skills/upgrade-libxposed-102
 ```
 
 ---
@@ -54,7 +59,7 @@ git submodule add https://github.com/<your-username>/skill-upgrade-libxposed-102
 
 ```bash
 # 安装到通用 agent skills 目录
-mkdir -p .claude/skills && git clone https://github.com/<your-username>/skill-upgrade-libxposed-102.git .claude/skills/upgrade-libxposed-102
+mkdir -p .claude/skills && git clone https://github.com/Marukon/skill-upgrade-libxposed-102.git .claude/skills/upgrade-libxposed-102
 ```
 
 ---
