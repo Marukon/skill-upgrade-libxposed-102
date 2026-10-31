@@ -91,23 +91,32 @@ io.github.marukon.imeauto.hook.ImeHookEntry
 ```
 
 #### 3. `scope.list`（作用域声明规范）
-每行一个目标包名，声明模块默认需要注入的应用。根据模块类型严格区分作用域：
-- **应用级 Hook 模块**（如针对微信、浏览器、特定第三方 App 增强）：**仅声明目标应用包名**（如 `com.tencent.mm`、`com.android.chrome`），无需包含 `android`，避免无谓的系统服务注入与潜在性能开销。
-- **系统服务级 Hook 模块**（如修改输入法调度、全局窗口策略、系统服务拦截）：**必须包含 `android`**（代表 Android Framework / System Server 进程），并配合 `onSystemServerStarting` 执行系统级挂钩。
+每行一个目标包名，声明模块默认需要注入的应用。根据模块类型严格按需声明作用域：
 
-示例（混合或按需声明）：
+> [!IMPORTANT]
+> **切勿盲目添加 `android` 作用域**：
+> - **应用级 Hook 模块**（绝大多数模块，如针对微信、QQ、浏览器、特定第三方 App 增强）：**仅声明目标应用包名**（如 `com.tencent.mm`、`com.android.chrome`），禁止包含 `android`，避免对整个 Android Framework / System Server 进行无谓注入和潜在系统性能开销。
+> - **系统服务级 Hook 模块**（如修改全局输入法调度、全局窗口策略、系统级服务拦截）：**才需要包含 `android`**（代表 Android Framework / System Server 进程），并配合 `onSystemServerStarting` 执行系统级挂钩。
+
+示例（普通应用级模块示例，无需包含 android）：
 ```text
-# 若为系统级模块才声明 android：
-# android
+com.tencent.mm
 com.android.chrome
 com.microsoft.emmx
 ```
 
+示例（系统级服务模块示例，才包含 android）：
+```text
+android
+```
+
 ---
 
-### 第三步：清单文件配置 (`AndroidManifest.xml`)
+### 第三步：清单文件配置 (`AndroidManifest.xml`) 与 隐藏桌面图标规范
 
 更新模块的 `AndroidManifest.xml`：
+
+#### 1. 基础模块元数据配置
 ```xml
 <application ...>
     <!-- 传统元数据保持兼容，关键将 xposedminversion 设为 102 -->
@@ -124,6 +133,70 @@ com.microsoft.emmx
         android:name="xposedscope"
         android:resource="@array/xposed_scope" />
 </application>
+```
+
+#### 2. 隐藏桌面图标与 LSPosed 界面唤醒必备配置
+许多模块支持“隐藏桌面图标”功能，仅通过 LSPosed / Xposed 管理器点击进入设置。为避免图标隐藏后 LSPosed 同样无法打开应用，必须严格遵循以下声明契约：
+
+> [!CAUTION]
+> **致命防坑：缺少 `MODULE_SETTINGS` 会导致用户被彻底锁在外面！**  
+> LSPosed 管理器判断模块是否有配置页时，首先检索带有 `de.robv.android.xposed.category.MODULE_SETTINGS` 分类的 Activity；若缺失则回退调用 `PackageManager.getLaunchIntentForPackage`（依赖桌面 `LAUNCHER`）。  
+> 一旦用户开启“隐藏桌面图标”禁用了 `LAUNCHER` 别名，且主 Activity 缺失 `MODULE_SETTINGS`，LSPosed 将判定该模块“无配置界面”，导致用户既无法在桌面找到图标，也无法在 LSPosed 中打开配置！
+
+**标准实现模板**：
+```xml
+<!-- 1. 主配置 Activity：声明 MODULE_SETTINGS，作为 LSPosed 管理器唤醒的核心入口 -->
+<activity
+    android:name=".ui.MainActivity"
+    android:exported="true"
+    android:theme="@style/Theme.App">
+    <!-- LSPosed / Xposed 官方模块设置识别入口（隐藏图标后仍能进入的关键） -->
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+    <!-- Android 系统应用首选项设置入口 -->
+    <intent-filter>
+        <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+    <!-- 系统兜底无图标 LaunchIntent 解析入口 -->
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.INFO" />
+        <category android:name="android.intent.category.DEFAULT" />
+    </intent-filter>
+</activity>
+
+<!-- 2. 桌面启动图标别名：隐藏桌面图标功能仅动态开启/关闭此别名组件 -->
+<activity-alias
+    android:name=".ui.LauncherAlias"
+    android:enabled="true"
+    android:exported="true"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:roundIcon="@mipmap/ic_launcher"
+    android:targetActivity=".ui.MainActivity">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity-alias>
+```
+
+**动态控制图标显示隐藏代码范式**：
+```kotlin
+fun setLauncherIconHidden(context: Context, hide: Boolean) {
+    val pm = context.packageManager
+    val aliasName = ComponentName(context, "${context.packageName}.ui.LauncherAlias")
+    val state = if (hide) {
+        PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+    } else {
+        PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+    }
+    pm.setComponentEnabledSetting(aliasName, state, PackageManager.DONT_KILL_APP)
+}
 ```
 
 ---
