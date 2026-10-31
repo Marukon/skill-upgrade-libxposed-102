@@ -90,10 +90,15 @@ exceptionMode=protective
 io.github.marukon.imeauto.hook.ImeHookEntry
 ```
 
-#### 3. `scope.list`（推荐作用域）
-每行一个目标包名，声明模块默认需要注入的应用。若需要挂钩系统核心服务，必须包含 `android`：
+#### 3. `scope.list`（作用域声明规范）
+每行一个目标包名，声明模块默认需要注入的应用。根据模块类型严格区分作用域：
+- **应用级 Hook 模块**（如针对微信、浏览器、特定第三方 App 增强）：**仅声明目标应用包名**（如 `com.tencent.mm`、`com.android.chrome`），无需包含 `android`，避免无谓的系统服务注入与潜在性能开销。
+- **系统服务级 Hook 模块**（如修改输入法调度、全局窗口策略、系统服务拦截）：**必须包含 `android`**（代表 Android Framework / System Server 进程），并配合 `onSystemServerStarting` 执行系统级挂钩。
+
+示例（混合或按需声明）：
 ```text
-android
+# 若为系统级模块才声明 android：
+# android
 com.android.chrome
 com.microsoft.emmx
 ```
